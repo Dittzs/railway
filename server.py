@@ -1,11 +1,16 @@
 import os
 import time
 import requests
-from flask import Flask, jsonify
+from flask import Flask, jsonify, make_response
 
 app = Flask(__name__)
 TMDB = "27783cb7ebda05c652a7934334d3e002"
 current = {}
+
+def add_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 def tmdb_lookup(imdb_id):
     try:
@@ -27,11 +32,11 @@ def tmdb_lookup(imdb_id):
 
 @app.route("/")
 def index():
-    return "OK"
+    return add_cors(make_response("OK"))
 
 @app.route("/manifest.json")
 def manifest():
-    return jsonify({
+    return add_cors(make_response(jsonify({
         "id": "community.stremiodiscordrpc.railway",
         "version": "1.0.0",
         "name": "Discord RPC",
@@ -40,7 +45,7 @@ def manifest():
         "types": ["movie", "series"],
         "catalogs": [],
         "idPrefixes": ["tt"],
-    })
+    })))
 
 @app.route("/stream/<type>/<id>.json")
 def stream(type, id):
@@ -52,10 +57,10 @@ def stream(type, id):
     detail = f"S{season:02d}E{episode:02d}" if season and episode else "Assistindo"
     current.update({"title": title, "detail": detail, "poster": poster, "start": int(time.time())})
     print(f"▶  {title} — {detail}", flush=True)
-    return jsonify({"streams": []})
+    return add_cors(make_response(jsonify({"streams": []})))
 
 @app.route("/now")
 def now():
-    return jsonify(current)
+    return add_cors(make_response(jsonify(current)))
 
 app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
