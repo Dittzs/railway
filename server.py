@@ -1,11 +1,28 @@
 import os
 import time
+import json
 import requests
 from flask import Flask, jsonify, make_response
 
 app = Flask(__name__)
 TMDB = "27783cb7ebda05c652a7934334d3e002"
-current = {}
+STATE_FILE = "/tmp/current_state.json"
+
+def load_state():
+    try:
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_state(data):
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+current = load_state()
 
 def add_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -49,15 +66,24 @@ def manifest():
 
 @app.route("/stream/<type>/<id>.json")
 def stream(type, id):
+    global current
     parts = id.split(":")
     imdb_id = parts[0]
     season = int(parts[1]) if len(parts) > 1 else None
     episode = int(parts[2]) if len(parts) > 2 else None
     title, poster = tmdb_lookup(imdb_id)
     detail = f"S{season:02d}E{episode:02d}" if season and episode else "Assistindo"
-    current.update({"title": title, "detail": detail, "poster": poster, "start": int(time.time())})
+    current = {"title": title, "detail": detail, "poster": poster, "start": int(time.time())}
+    save_state(current)
     print(f"▶  {title} — {detail}", flush=True)
     return add_cors(make_response(jsonify({"streams": []})))
+
+@app.route("/clear")
+def clear():
+    global current
+    current = {}
+    save_state(current)
+    return add_cors(make_response("cleared"))
 
 @app.route("/now")
 def now():
